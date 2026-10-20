@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="herdr-icucomefrom logo" width="120" align="right">
+
 # herdr-icucomefrom
 
 A [herdr](https://herdr.dev) plugin that guesses whether the herdr client

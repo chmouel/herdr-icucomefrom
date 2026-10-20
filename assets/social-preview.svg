@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#1B1F3B"/>
+  <g transform="translate(275 320) scale(0.92) translate(-256 -256)">
+    <path d="M56 256 Q256 40 456 256 Q256 472 56 256 Z" fill="#262B52" stroke="#DCE3F0" stroke-width="22" stroke-linejoin="round"/>
+    <circle cx="256" cy="256" r="74" fill="none" stroke="#8BD17C" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="0.00" transform="rotate(-83.81 256 256)"/>
+    <circle cx="256" cy="256" r="74" fill="none" stroke="#F5B841" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="-154.99" transform="rotate(-83.81 256 256)"/>
+    <circle cx="256" cy="256" r="74" fill="none" stroke="#F07FA8" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="-309.97" transform="rotate(-83.81 256 256)"/>
+    <rect x="241" y="222" width="30" height="68" rx="4" fill="#DCE3F0"/>
+  </g>
+  <g font-family="JetBrains Mono" fill="#DCE3F0">
+    <text x="540" y="214" font-size="54" font-weight="700">herdr-icucomefrom</text>
+    <text x="540" y="262" font-size="24" fill="#8F98BF">Your prompt knows where you're typing from.</text>
+    <g font-size="34" font-weight="500">
+      <text x="540" y="372" fill="#8BD17C">~/src %</text>
+      <rect x="700" y="346" width="18" height="34" fill="#8BD17C"/>
+      <text x="540" y="436" fill="#F5B841">~/src %</text>
+      <rect x="700" y="410" width="18" height="34" fill="#F5B841"/>
+      <text x="540" y="500" fill="#F07FA8">%</text>
+      <rect x="580" y="474" width="18" height="34" fill="#F07FA8"/>
+    </g>
+    <g font-size="24" fill="#8F98BF">
+      <text x="780" y="370">at your desk</text>
+      <text x="780" y="434">over ssh</text>
+      <text x="780" y="498">on your phone</text>
+    </g>
+  </g>
+</svg>

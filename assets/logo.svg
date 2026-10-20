@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="herdr-icucomefrom logo">
+  <rect width="512" height="512" rx="112" fill="#1B1F3B"/>
+  <path d="M56 256 Q256 40 456 256 Q256 472 56 256 Z" fill="#262B52" stroke="#DCE3F0" stroke-width="22" stroke-linejoin="round"/>
+  <circle cx="256" cy="256" r="74" fill="none" stroke="#8BD17C" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="0.00" transform="rotate(-83.81 256 256)"/>
+  <circle cx="256" cy="256" r="74" fill="none" stroke="#F5B841" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="-154.99" transform="rotate(-83.81 256 256)"/>
+  <circle cx="256" cy="256" r="74" fill="none" stroke="#F07FA8" stroke-width="26" stroke-dasharray="138.99 325.97" stroke-dashoffset="-309.97" transform="rotate(-83.81 256 256)"/>
+  <rect x="241" y="222" width="30" height="68" rx="4" fill="#DCE3F0"/>
+</svg>
