@@ -1,0 +1,32 @@
+id = "herdr-icucomefrom"
+name = "I see you come from"
+version = "0.1.0"
+min_herdr_version = "0.9.0"
+description = "Guesses whether the herdr client you're using is attached over ssh or locally"
+platforms = ["linux", "macos"]
+
+[[build]]
+command = ["sh", "install.sh"]
+
+[[startup]]
+command = ["sh", "install.sh"]
+
+[[actions]]
+id = "status"
+title = "Show client transport"
+description = "List the attached clients and whether each one came over ssh"
+contexts = ["global"]
+command = [
+  "sh",
+  "-c",
+  'herdr_bin="${HERDR_BIN_PATH:-herdr}"; [ -x "$herdr_bin" ] || herdr_bin=herdr; exec "$herdr_bin" plugin pane open --plugin herdr-icucomefrom --entrypoint status --placement popup',
+]
+
+[[panes]]
+id = "status"
+title = "Client transport"
+description = "Attached clients and their transport"
+placement = "popup"
+width = "80%"
+height = "50%"
+command = ["sh", "-c", "python3 bin/herdr-icucomefrom status; printf '\\nPress Enter to close. '; read -r _"]
