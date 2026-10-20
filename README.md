@@ -29,6 +29,8 @@ herdr creates the `~/.local/bin` link at the next server start, or you can run
 herdr-icucomefrom            print ssh or local
 herdr-icucomefrom is-ssh     exit 0 on ssh, 1 otherwise
 herdr-icucomefrom is-local   exit 0 on local, 1 otherwise
+herdr-icucomefrom device     print the ssh key name of the client, or mobile, ssh or local
+herdr-icucomefrom is-mobile  exit 0 on an ssh client narrower than 100 columns
 herdr-icucomefrom status     show every client and why the guess came out that way
 ```
 
@@ -67,6 +69,31 @@ Each call takes around 70 ms on Linux, most of it in `ss`.
 The plugin also adds a "Show client transport" action that opens `status` in
 a popup.
 
+## Phones
+
+Phone ssh apps don't announce themselves. Haven, for one, sends the same
+`TERM` as a desktop terminal and no other variables. Two things still give a
+phone away, and both apply to the client the guess picked.
+
+Its screen is narrow. `is-mobile` treats an ssh client under 100 columns as a
+phone, and `--cols` changes the limit. A shorter prompt on the phone in zsh:
+
+```zsh
+_herdr_prompt() { herdr-icucomefrom is-mobile && PROMPT='%# ' || PROMPT='%~ %# ' }
+add-zsh-hook precmd _herdr_prompt
+```
+
+sshd also logs which key each login used. `device` finds that log line and
+prints the key's comment from `~/.ssh/authorized_keys`. For that to name your
+phone, give the phone app its own key and a comment you'll recognize:
+
+```text
+ssh-ed25519 AAAA... haven
+```
+
+Without a key name, `device` prints `mobile` for a narrow ssh client and
+`ssh` or `local` otherwise. A lookup adds around 20 ms.
+
 ## How it guesses
 
 Every process connected to the server's `herdr-client.sock` is a client. A
@@ -88,11 +115,17 @@ the local terminals. Failing that, the terminal with the latest input wins.
   two terminals within a few seconds can give the wrong answer for a moment.
 - The tool can't see typing through a `herdr --remote` bridge, so a local
   terminal you touched in the last 10 seconds wins over it.
+- Key names need `journalctl`, and your user must be able to read sshd's
+  journal entries. macOS gets the width check only.
+- mosh-server detaches from sshd, so mosh clients get the width check but no
+  key name.
+- A desktop terminal over ssh narrower than the limit counts as a phone.
 - macOS support is untested.
 
 ## Requirements
 
 Python 3.9 or later, plus `ss` from iproute2 on Linux or `lsof` on macOS.
+Key names in `device` also use `journalctl` and `ssh-keygen`.
 
 ## License
 

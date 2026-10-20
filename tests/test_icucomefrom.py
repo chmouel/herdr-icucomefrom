@@ -6,8 +6,17 @@ from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
 from icucomefrom import cli
-from icucomefrom.backends import DetectError, Proc, parse_procargs2, parse_ss, peers_from_ss, run
-from icucomefrom.detect import Result, detect
+from icucomefrom.backends import (
+    DetectError,
+    Proc,
+    parse_accepted,
+    parse_keygen,
+    parse_procargs2,
+    parse_ss,
+    peers_from_ss,
+    run,
+)
+from icucomefrom.detect import Client, Result, detect
 
 SOCK = "/run/h/herdr.sock"
 NOW = 1000.0
@@ -28,9 +37,10 @@ def bridge(pid):
 
 
 class Fake:
-    def __init__(self, clients, error=None):
+    def __init__(self, clients, error=None, key=None):
         self.clients = clients
         self.error = error
+        self.key = key
 
     def socket_peers(self, path):
         assert path == "/run/h/herdr-client.sock"
@@ -43,6 +53,9 @@ class Fake:
 
     def ancestry(self, pid):
         return self.clients[pid][1]
+
+    def ssh_key(self, pid, ssh_connection):
+        return self.key
 
 
 def guess(clients, env=None, **kw):
@@ -72,6 +85,12 @@ class GuessTest(unittest.TestCase):
         clients = {10: tty(10, NOW - 60), 11: tty(11, NOW - 300, "10.1.1.1")}
         self.assertEqual(guess(clients).client, "local")
 
+    def test_picked_client_follows_the_guess(self):
+        clients = {10: tty(10, NOW - 3), 11: tty(11, NOW - 200, "10.1.1.1"), 12: bridge(12)}
+        self.assertEqual(guess(clients).picked.pid, 10)
+        clients = {10: tty(10, NOW - 60), 12: bridge(12)}
+        self.assertEqual(guess(clients).picked.pid, 12)
+
     def test_unreadable_client_is_skipped(self):
         proc, _ = tty(11, NOW - 1)
         proc.env = None
@@ -92,9 +111,11 @@ class GuessTest(unittest.TestCase):
 
 
 class CliTest(unittest.TestCase):
-    def call(self, argv, res):
+    def call(self, argv, res, key=None):
         out, err = io.StringIO(), io.StringIO()
-        with mock.patch.object(cli, "run_detect", return_value=res), redirect_stdout(out), redirect_stderr(err):
+        backend = Fake({}, key=key)
+        patch = mock.patch.object(cli, "run_detect", return_value=(backend, res))
+        with patch, redirect_stdout(out), redirect_stderr(err):
             code = cli.main(argv)
         return code, out.getvalue(), err.getvalue()
 
@@ -106,6 +127,22 @@ class CliTest(unittest.TestCase):
         ssh = Result("ssh", "every client agrees")
         self.assertEqual(self.call(["is-ssh"], ssh)[0], 0)
         self.assertEqual(self.call(["is-local"], ssh)[0], 1)
+
+    def phone(self, cols, transport="ssh"):
+        client = Client(10, transport, "tty", "/dev/pts/1", NOW, "10.1.1.1 40928 10.0.0.1 22", "", cols, 23)
+        return Result(transport, "pid 10 saw input recently", picked=client)
+
+    def test_device_prefers_key_name_then_width(self):
+        self.assertEqual(self.call(["device"], self.phone(49), key="haven")[1], "haven\n")
+        self.assertEqual(self.call(["device"], self.phone(49))[1], "mobile\n")
+        self.assertEqual(self.call(["device"], self.phone(120))[1], "ssh\n")
+        self.assertEqual(self.call(["device"], Result("local", "from this shell's environment"))[1], "local\n")
+
+    def test_is_mobile_needs_a_narrow_ssh_client(self):
+        self.assertEqual(self.call(["is-mobile"], self.phone(49))[0], 0)
+        self.assertEqual(self.call(["is-mobile", "--cols", "40"], self.phone(49))[0], 1)
+        self.assertEqual(self.call(["is-mobile"], self.phone(49, "local"))[0], 1)
+        self.assertEqual(self.call(["is-mobile"], Result("ssh", "from this shell's environment"))[0], 1)
 
 
 SS_TEXT = """\
@@ -129,6 +166,19 @@ class ParserTest(unittest.TestCase):
     def test_procargs2_splits_argv_and_env(self):
         buf = (2).to_bytes(4, "little") + b"/usr/bin/herdr\0\0\0herdr\0--session\0A=1\0SSH_TTY=/dev/x\0\0junk"
         self.assertEqual(parse_procargs2(buf), (["herdr", "--session"], {"A": "1", "SSH_TTY": "/dev/x"}))
+
+    def test_accepted_line_gives_the_key_of_the_matching_login(self):
+        log = (
+            "Accepted publickey for me from 10.1.1.1 port 40928 ssh2: ED25519 SHA256:phone\n"
+            "Accepted publickey for me from 10.1.1.1 port 50000 ssh2: ED25519 SHA256:other\n"
+            "Accepted password for me from 10.1.1.2 port 40928 ssh2\n"
+        )
+        self.assertEqual(parse_accepted(log, "10.1.1.1", "40928"), "SHA256:phone")
+        self.assertIsNone(parse_accepted(log, "10.1.1.2", "40928"))
+
+    def test_keygen_maps_fingerprints_to_comments(self):
+        text = "256 SHA256:phone haven pixel (ED25519)\n256 SHA256:bare no comment (ED25519)\n"
+        self.assertEqual(parse_keygen(text), {"SHA256:phone": "haven pixel"})
 
     def test_missing_command_names_it(self):
         with self.assertRaisesRegex(DetectError, "no-such-cmd-xyz is not installed"):

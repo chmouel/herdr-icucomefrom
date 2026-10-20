@@ -6,10 +6,13 @@ into "unknown" instead of guessing.
 
 from __future__ import annotations
 
+import fcntl
 import os
 import re
+import struct
 import subprocess
 import sys
+import termios
 import time
 from dataclasses import dataclass
 
@@ -116,6 +119,49 @@ def ssh_env(env):
     return bool(env and (env.get("SSH_CONNECTION") or env.get("SSH_TTY")))
 
 
+def tty_size(path):
+    """Return (cols, rows) of a terminal, or None."""
+    if not path:
+        return None
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOCTTY | os.O_NONBLOCK)
+    except OSError:
+        return None
+    try:
+        rows, cols = struct.unpack("HHHH", fcntl.ioctl(fd, termios.TIOCGWINSZ, bytes(8)))[:2]
+    except OSError:
+        return None
+    finally:
+        os.close(fd)
+    return (cols, rows) if cols else None
+
+
+ACCEPTED = re.compile(r"Accepted \S+ for \S+ from (\S+) port (\d+) ssh2(?:: \S+ (SHA256:\S+))?")
+
+
+def parse_accepted(text, ip, port):
+    """Return the key fingerprint of the last login from ip and port, or None."""
+    fingerprint = None
+    for line in text.splitlines():
+        m = ACCEPTED.match(line)
+        if m and m.group(1) == ip and m.group(2) == port:
+            fingerprint = m.group(3)
+    return fingerprint
+
+
+def parse_keygen(text):
+    """Map fingerprints to key comments from `ssh-keygen -lf` output."""
+    names = {}
+    for line in text.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        comment = parts[2].rpartition(" (")[0].strip()
+        if comment and comment != "no comment":
+            names[parts[1]] = comment
+    return names
+
+
 class LinuxBackend:
     supports_tty_atime = True
 
@@ -191,6 +237,31 @@ class LinuxBackend:
             names.append(st[0])
             ppid = st[1]
         return names
+
+    def ssh_key(self, pid, ssh_connection):
+        """Return the authorized_keys comment of the key pid's ssh login used, or None.
+
+        sshd logs the login under the pid of an sshd ancestor, so look that up
+        in the journal and match the source address and port.
+        """
+        parts = ssh_connection.split()
+        if len(parts) < 2:
+            return None
+        try:
+            fingerprint = None
+            st = self._stat(pid)
+            while fingerprint is None and st is not None and st[1] > 1:
+                ppid = st[1]
+                st = self._stat(ppid)
+                if st is not None and st[0] in ("sshd", "sshd-session"):
+                    log = run(["journalctl", "--no-pager", "-q", "-o", "cat", f"_PID={ppid}"], self.deadline)
+                    fingerprint = parse_accepted(log, parts[0], parts[1])
+            if fingerprint is None:
+                return None
+            keys = os.path.expanduser("~/.ssh/authorized_keys")
+            return parse_keygen(run(["ssh-keygen", "-lf", keys], self.deadline)).get(fingerprint)
+        except DetectError:
+            return None
 
 
 def parse_procargs2(data):
@@ -331,6 +402,9 @@ class MacBackend:
             names.append(row[2])
             ppid = row[0]
         return names if ppid == 1 else None
+
+    def ssh_key(self, pid, ssh_connection):
+        return None
 
 
 def default_backend(deadline):
